@@ -1,0 +1,27 @@
+services:
+  scheduler:
+    image: 127.0.0.1:5000/otsun_notebook:__TAG__
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+
+  worker:
+    image: 127.0.0.1:5000/otsun_notebook:__TAG__
+    deploy:
+      replicas: 6
+      placement:
+        constraints: [node.role == worker]
+        preferences:
+          - spread: node.id
+
+  client:
+    image: 127.0.0.1:5000/otsun_notebook:__TAG__
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+
+  notebook:
+    image: 127.0.0.1:5000/otsun_notebook:__TAG__
+    deploy:
+      placement:
+        constraints: [node.role == manager]

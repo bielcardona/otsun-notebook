@@ -1,0 +1,43 @@
+version: "3.8"
+
+services:
+  scheduler:
+    command: dask scheduler
+    ports:
+      - "8786:8786"
+      - "8787:8787"
+    networks:
+      - dasknet
+
+  worker:
+    command: dask worker --nworkers 2 --nthreads 1 tcp://scheduler:8786
+    depends_on:
+      - scheduler
+    networks:
+      - dasknet
+
+  client:
+    command: sleep infinity
+    depends_on:
+      - scheduler
+    networks:
+      - dasknet
+    volumes:
+      - /data/notebooks:/notebooks
+    stdin_open: true
+    tty: true
+
+  notebook:
+    command: jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --config=/dist/jupyter_notebook_config.py
+    ports:
+      - "8888:8888"
+    volumes:
+      - /data/notebooks:/notebooks
+    depends_on:
+      - scheduler
+    networks:
+      - dasknet
+
+networks:
+  dasknet:
+  

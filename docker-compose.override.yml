@@ -1,0 +1,13 @@
+services:
+  scheduler:
+    build: .
+    image: dask_optuna_otsun:dev
+
+  worker:
+    image: dask_optuna_otsun:dev
+
+  client:
+    image: dask_optuna_otsun:dev
+
+  notebook:
+    image: dask_optuna_otsun:dev

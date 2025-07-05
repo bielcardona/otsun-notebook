@@ -13,7 +13,7 @@ TAG ?= $(shell git rev-parse --short HEAD)
 IMAGE ?= $(REGISTRY)/$(IMAGE_NAME):$(TAG)
 
 # Nom de l'stack de Swarm
-STACK ?= otsun
+STACK ?= otsun-notebook
 
 # Fitxers de configuració
 BASE ?= docker-compose.base.yml

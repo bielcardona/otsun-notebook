@@ -1,13 +1,13 @@
 services:
   scheduler:
     build: .
-    image: dask_optuna_otsun:dev
+    image: ${IMAGE_NAME}:dev
 
   worker:
-    image: dask_optuna_otsun:dev
+    image: ${IMAGE_NAME}:dev
 
   client:
-    image: dask_optuna_otsun:dev
+    image: ${IMAGE_NAME}:dev
 
   notebook:
-    image: dask_optuna_otsun:dev
+    image: ${IMAGE_NAME}:dev

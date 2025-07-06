@@ -8,7 +8,7 @@ services:
       - dasknet
 
   worker:
-    command: dask worker --nworkers 2 --nthreads 1 tcp://scheduler:8786
+    command: dask worker --nworkers ${NUM_WORKERS_PER_CONTAINER} --nthreads 1 tcp://scheduler:8786
     depends_on:
       - scheduler
     networks:
@@ -21,7 +21,7 @@ services:
     networks:
       - dasknet
     volumes:
-      - /data/notebooks:/notebooks
+      - ${NOTEBOOKS_DIR}:/notebooks
     stdin_open: true
     tty: true
 
@@ -30,7 +30,7 @@ services:
     ports:
       - "8888:8888"
     volumes:
-      - /data/notebooks:/notebooks
+      - ${NOTEBOOKS_DIR}:/notebooks
     depends_on:
       - scheduler
     networks:

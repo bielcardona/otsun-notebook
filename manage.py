@@ -8,8 +8,11 @@ import re
 import argparse
 
 BASE_DIR = Path(__file__).resolve().parent
-TEMPLATE_FILE = BASE_DIR / "docker-compose.stack.yml.template"
-RENDERED_FILE = BASE_DIR / "docker-compose.stack.yml"
+# TEMPLATE_FILE = BASE_DIR / "docker-compose.stack.yml.template"
+# RENDERED_FILE = BASE_DIR / "docker-compose.stack.yml"
+
+SWARM_TEMPLATE_FILE = BASE_DIR / "docker-compose.swarm.yml.template"
+SWARM_RENDERED_FILE = BASE_DIR / "docker-compose.swarm.yml"
 
 def run(cmd):
     print(f"▶️  {' '.join(cmd)}")
@@ -49,12 +52,12 @@ def down(extra_args=[]):
     run(["docker", "compose", *files, "down", *extra_args])
 
 def push(extra_args=[]):
-    files = ["-f", env_vars["BASE"], "-f", env_vars["OVERRIDE"]]
+    files = ["-f", env_vars["BASE"], "-f", env_vars["SWARM"]]
     run(["docker", "compose", *files, "push", *extra_args])
 
 def render(extra_args=[]):
     print("🧩 Renderitzant plantilla YAML sense Jinja2...")
-    with open(TEMPLATE_FILE) as f:
+    with open(SWARM_TEMPLATE_FILE) as f:
         content = f.read()
 
     def replacer(match):
@@ -64,13 +67,13 @@ def render(extra_args=[]):
     rendered = re.sub(r"\$\{(\w+)\}", replacer, content)
 
     # RENDERED_FILE.parent.mkdir(exist_ok=True)
-    with open(RENDERED_FILE, "w") as f:
+    with open(SWARM_RENDERED_FILE, "w") as f:
         f.write(rendered)
-    print(f"✅ Fitxer renderitzat a {RENDERED_FILE}")
+    print(f"✅ Fitxer renderitzat a {SWARM_RENDERED_FILE}")
 
 def stack(extra_args=[]):
     render()
-    run(["docker", "stack", "deploy", "-c", str(RENDERED_FILE), env_vars["PROJECT_NAME"], *extra_args])
+    run(["docker", "stack", "deploy", "-c", str(SWARM_RENDERED_FILE), env_vars["PROJECT_NAME"], *extra_args])
 
 def stack_down(extra_args=[]):
     run(["docker", "stack", "rm", env_vars["PROJECT_NAME"], *extra_args])
@@ -81,7 +84,7 @@ def deploy(extra_args=[]):
     run([
         "docker", "stack", "deploy",
         "-c", env_vars["BASE"],
-        "-c", env_vars["GENERATED"],
+        "-c", env_vars["SWARM"],
         "--with-registry-auth",
         *env_vars.get("ARGS", "").split(),
         env_vars["STACK"],
@@ -117,7 +120,6 @@ def load_default_env(env_vars):
         "BASE": "docker-compose.base.yml",
         "OVERRIDE": "docker-compose.override.yml",
         "SWARM": "docker-compose.swarm.yml",
-        "GENERATED": "docker-compose.generated.yml",
         "MODE": "",
         "ARGS": "",
         "NOTEBOOKS_DIR": ".",

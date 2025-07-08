@@ -8,11 +8,18 @@ import re
 import argparse
 
 BASE_DIR = Path(__file__).resolve().parent
-# TEMPLATE_FILE = BASE_DIR / "docker-compose.stack.yml.template"
-# RENDERED_FILE = BASE_DIR / "docker-compose.stack.yml"
 
+
+BASE_TEMPLATE_FILE = BASE_DIR / "docker-compose.base.yml.template"
+BASE_RENDERED_FILE = BASE_DIR / "docker-compose.base.yml"
 SWARM_TEMPLATE_FILE = BASE_DIR / "docker-compose.swarm.yml.template"
 SWARM_RENDERED_FILE = BASE_DIR / "docker-compose.swarm.yml"
+OVERRIDE_FILE = BASE_DIR / "docker-compose.override.yml"
+
+        
+        # "BASE": "docker-compose.base.yml",
+        # "OVERRIDE": "docker-compose.override.yml",
+        # "SWARM": "docker-compose.swarm.yml",
 
 def run(cmd):
     print(f"▶️  {' '.join(cmd)}")
@@ -33,70 +40,66 @@ Comandes disponibles:
   render        - Substitueix variables i genera YAML final
   stack         - Deploy a docker stack
   stack-down    - Elimina l'stack
-  generate      - Genera el fitxer docker-compose per a Swarm
-  deploy        - Fa push, genera i desplega amb stack
   clean         - Elimina el fitxer generat
 """)
 
 def build(extra_args=[]):
-    files = ["-f", env_vars["BASE"], "-f", env_vars["OVERRIDE"]]
+    files = ["-f", str(BASE_RENDERED_FILE), "-f", str(OVERRIDE_FILE)]
+    run(["docker", "compose", *files, "build", *extra_args])
+
+def build_swarm(extra_args=[]):
+    files = ["-f", str(BASE_RENDERED_FILE), "-f", str(SWARM_RENDERED_FILE)]
     run(["docker", "compose", *files, "build", *extra_args])
 
 def up(extra_args=[]):
-    files = ["-f", env_vars["BASE"], "-f", env_vars["OVERRIDE"]]
-    mode = env_vars["MODE"].split() if env_vars["MODE"] else []
-    run(["docker", "compose", *files, "up", *mode, *extra_args])
+    files = ["-f", str(BASE_RENDERED_FILE), "-f", str(OVERRIDE_FILE)]
+    run(["docker", "compose", *files, "up", *extra_args])
 
 def down(extra_args=[]):
-    files = ["-f", env_vars["BASE"], "-f", env_vars["OVERRIDE"]]
+    files = ["-f", str(BASE_RENDERED_FILE), "-f", str(OVERRIDE_FILE)]
     run(["docker", "compose", *files, "down", *extra_args])
 
-def push(extra_args=[]):
-    files = ["-f", env_vars["BASE"], "-f", env_vars["SWARM"]]
-    run(["docker", "compose", *files, "push", *extra_args])
-
 def render(extra_args=[]):
-    print("🧩 Renderitzant plantilla YAML sense Jinja2...")
-    with open(SWARM_TEMPLATE_FILE) as f:
-        content = f.read()
-
     def replacer(match):
         var = match.group(1)
-        return env_vars.get(var, f"<{var}-NO-TROBAT>")
+        return os.environ.get(var, f"<{var}-NO-TROBAT>")
 
-    rendered = re.sub(r"\$\{(\w+)\}", replacer, content)
+    for (template_file, rendered_file) in [
+        (BASE_TEMPLATE_FILE, BASE_RENDERED_FILE),
+        (SWARM_TEMPLATE_FILE, SWARM_RENDERED_FILE)
+    ]:
+        with open(template_file) as f:
+            content = f.read()
 
-    # RENDERED_FILE.parent.mkdir(exist_ok=True)
-    with open(SWARM_RENDERED_FILE, "w") as f:
-        f.write(rendered)
-    print(f"✅ Fitxer renderitzat a {SWARM_RENDERED_FILE}")
+        rendered = re.sub(r"\$\{(\w+)\}", replacer, content)
+        with open(rendered_file, "w") as f:
+            f.write(rendered)
+        print(f"✅ Fitxer renderitzat a {rendered_file}")
+
+
+def push(extra_args=[]):
+    build_swarm(extra_args=extra_args)
+    files = ["-f", str(BASE_RENDERED_FILE), "-f", str(SWARM_RENDERED_FILE)]
+    run(["docker", "compose", *files, "push", *extra_args])
 
 def stack(extra_args=[]):
-    render()
-    run(["docker", "stack", "deploy", "-c", str(SWARM_RENDERED_FILE), env_vars["PROJECT_NAME"], *extra_args])
+    run(["docker", "stack", "deploy", 
+         "-c", str(BASE_RENDERED_FILE), "-c", str(SWARM_RENDERED_FILE), 
+         "--with-registry-auth",
+         os.environ["STACK_NAME"], *extra_args])
 
 def stack_down(extra_args=[]):
-    run(["docker", "stack", "rm", env_vars["PROJECT_NAME"], *extra_args])
-
-def deploy(extra_args=[]):
-    push()
-    render()
-    run([
-        "docker", "stack", "deploy",
-        "-c", env_vars["BASE"],
-        "-c", env_vars["SWARM"],
-        "--with-registry-auth",
-        *env_vars.get("ARGS", "").split(),
-        env_vars["STACK"],
-        *extra_args
-    ])
+    run(["docker", "stack", "rm", os.environ["STACK_NAME"], *extra_args])
 
 def clean(extra_args=[]):
-    try:
-        os.remove(env_vars["GENERATED"])
-        print(f"🧹 Fitxer {env_vars['GENERATED']} eliminat.")
-    except FileNotFoundError:
-        print(f"ℹ️ Fitxer {env_vars['GENERATED']} no trobat.")
+    for template_file in BASE_DIR.rglob("*.template"):
+        target_file = template_file.with_suffix('')  # treu la part .template
+        if target_file.exists():
+            try:
+                target_file.unlink()
+                print(f"🗑️ Esborrat: {target_file}")
+            except Exception as e:
+                print(f"⚠️ No s'ha pogut esborrar {target_file}: {e}")
 
 actions = {
     "build": build,
@@ -106,7 +109,6 @@ actions = {
     "render": render,
     "stack": stack,
     "stack-down": stack_down,
-    "deploy": deploy,
     "clean": clean,
     "help": help
 }
@@ -116,12 +118,7 @@ def load_default_env(env_vars):
         "REGISTRY": "127.0.0.1:5000",
         "IMAGE_NAME": "otsun_notebook",
         "TAG": subprocess.getoutput("git rev-parse --short HEAD"),
-        "STACK": "otsun-notebook",
-        "BASE": "docker-compose.base.yml",
-        "OVERRIDE": "docker-compose.override.yml",
-        "SWARM": "docker-compose.swarm.yml",
-        "MODE": "",
-        "ARGS": "",
+        "STACK_NAME": "otsun-notebook",
         "NOTEBOOKS_DIR": ".",
         "NUM_WORKER_CONTAINERS": "6",
         "NUM_WORKERS_PER_CONTAINER": "1",
@@ -150,5 +147,7 @@ if __name__ == "__main__":
     env_vars = dotenv_values(ENV_FILE)
 
     load_default_env(env_vars)
-    os.environ.update(env_vars)
+    for k, v in env_vars.items():
+        os.environ.setdefault(k, v)    
+    render()
     actions[args.command](extra_args)

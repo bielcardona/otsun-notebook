@@ -16,6 +16,8 @@ services:
 
   client:
     command: sleep infinity
+    ports:
+      - "8080:8080"
     depends_on:
       - scheduler
     networks:

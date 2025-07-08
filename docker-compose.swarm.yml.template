@@ -1,6 +1,7 @@
 services:
   scheduler:
     image: ${REGISTRY}/${IMAGE_NAME}:${TAG}
+    build: .
     deploy:
       placement:
         constraints: [node.role == manager]
@@ -8,11 +9,12 @@ services:
   worker:
     image: ${REGISTRY}/${IMAGE_NAME}:${TAG}
     deploy:
-      replicas: ${NUM_WORKERS}
+      replicas: ${NUM_WORKER_CONTAINERS}
       placement:
         constraints: [node.role == worker]
         preferences:
           - spread: node.id
+        max_replicas_per_node: 1
 
   client:
     image: ${REGISTRY}/${IMAGE_NAME}:${TAG}
